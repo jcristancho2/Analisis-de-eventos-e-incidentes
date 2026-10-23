@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: 'Geist Mono', monospace;
+  }
+
+  body {
+    background-color: #f5f5f5;
+    color: #111827;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+}
+
+.page-wrapper {
+  background: linear-gradient(to bottom, #faf7ff 0%, #f5f5f7 100%);
+  min-height: 100vh;
+  overflow-x: clip;
+}
+
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes icon-turn {
+  from { transform: rotate(-110deg) scale(.7); opacity: .3; }
+  to { transform: rotate(0) scale(1); opacity: 1; }
+}
+
+.page-enter { animation: page-enter .42s cubic-bezier(.22, 1, .36, 1) both; }
+.page-enter-delayed { animation-delay: .1s; }
+
+button {
+  transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease, border-color .16s ease, color .16s ease;
+}
+
+button:not(:disabled):active { transform: scale(.97); }
+.theme-toggle svg { animation: icon-turn .28s cubic-bezier(.22, 1, .36, 1); }
+
+.theme-dark body { background: #0b1120; color: #e2e8f0; }
+.theme-dark .page-wrapper { background: linear-gradient(to bottom, #13102a 0%, #0b1120 100%); }
+.theme-dark header, .theme-dark footer, .theme-dark [class*="bg-white"] { background-color: #151e2e !important; }
+.theme-dark [class*="bg-slate-50"], .theme-dark [class*="bg-slate-100"] { background-color: #1e293b !important; }
+.theme-dark [class*="border-"] { border-color: #334155 !important; }
+.theme-dark [class*="text-slate-"] { color: #dbe5f1 !important; }
+.theme-dark input, .theme-dark textarea, .theme-dark select { background-color: #0f172a !important; color: #e2e8f0; border-color: #475569 !important; }
+.theme-dark .theme-toggle { background: #1e293b !important; color: #fde68a !important; border-color: #475569 !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
+
+button, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgb(124 58 237 / 0.35);
+  outline-offset: 2px;
+}
+
+@media (max-width: 639px) {
+  html { font-size: 15px; }
+  .page-wrapper main { padding-inline: 1rem; padding-top: 1rem; }
+}
+
+/* Custom scrollbars for data-dense clinical table */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f4;
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

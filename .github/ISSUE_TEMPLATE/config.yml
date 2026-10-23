@@ -1,0 +1,23 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question about using The Architect
+    url: https://github.com/Hainrixz/the-architect/discussions/categories/q-a
+    about: >-
+      How to install it, how to phrase a brief, which shape fits, how to hand a blueprint to a
+      builder. Ask in Q&A — questions get answered faster there than in the issue tracker.
+
+  - name: Show a blueprint you generated
+    url: https://github.com/Hainrixz/the-architect/discussions/categories/show-and-tell
+    about: >-
+      Post it in Show and tell. Generated blueprints and the projects built from them are never
+      merged into this repo — do not open a pull request for one.
+
+  - name: Idea or feature request
+    url: https://github.com/Hainrixz/the-architect/discussions/categories/ideas
+    about: >-
+      New commands, new capabilities, workflow changes. Start it as a discussion; it becomes an
+      issue once the design is settled. New project shapes have their own form above.
+
+  - name: Report a security issue
+    url: https://github.com/Hainrixz/the-architect/security/advisories/new
+    about: Private disclosure. Do not open a public issue for anything security-sensitive.

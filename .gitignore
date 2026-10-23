@@ -1,0 +1,21 @@
+# Generated blueprints
+# v2 writes blueprints to the USER's working directory, not into this repo.
+# These patterns only matter if you run The Architect from inside a clone.
+blueprints/
+output/*.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local Claude Code settings for THIS repo.
+# Note: this does NOT affect the plugin surface — .claude-plugin/, skills/,
+# agents/ and commands/ live at the repo root and are tracked.
+.claude/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

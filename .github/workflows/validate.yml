@@ -1,0 +1,354 @@
+# Guardrails for the v2 architecture. Deliberately small: three greps and a manifest check,
+# no third-party actions, nothing to keep up to date.
+name: validate
+on:
+  push: { branches: [main] }
+  pull_request:
+permissions: { contents: read }
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      SURFACE: knowledge commands agents skills questions templates CLAUDE.md README.md
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Plugin and marketplace manifests
+        run: |
+          CLI="npx -y @anthropic-ai/claude-code@latest"
+          if $CLI --version >/dev/null 2>&1; then $CLI plugin validate .
+          else echo "::notice::Claude Code CLI unavailable — manifest validation skipped."; fi
+
+      - name: Version pins live only in runtime-tracks
+        run: |
+          # Scans the WHOLE REPO except knowledge/runtime-tracks/ — the one directory where pins
+          # are legal. It used to scan only knowledge/, which enforced the doctrine exactly where
+          # the repo was already clean: a pin leaking into templates/, agents/, commands/,
+          # questions/, skills/, CLAUDE.md or README.md passed green, and those are the files a
+          # blueprint is actually composed from. Scanning one root is also how a pinned stack table
+          # survived in knowledge/stack-compatibility.md through a whole release audit.
+          LIB='next\.js|nextjs|react native|react|tailwind|vite|vitest|node\.js|node|pnpm|yarn|bun'
+          LIB="$LIB"'|deno|biome|eslint|prettier|drizzle|prisma|astro|expo sdk|expo|typescript'
+          LIB="$LIB"'|python|ruby|django|fastapi|rails|laravel|php|sveltekit|svelte|vue|nuxt'
+          LIB="$LIB"'|angular|electron|java|tauri|flutter|swiftui|kotlin|dotnet|rust|cargo'
+          LIB="$LIB"'|postgres|redis|sqlite|tanstack|trpc|zod|hono|clerk|shadcn/ui|shadcn|zustand'
+          LIB="$LIB"'|sqlalchemy|alembic|pydantic|celery|htmx|remix|qwik|playwright|jest|webpack'
+          LIB="$LIB"'|rollup|esbuild|turbopack|graphql|apollo'
+          # Connector words, so "TypeScript to 6.9.2" and "pin Tailwind at v4" are caught too and not
+          # just the adjacent form. Kept to a closed list: a wildcard gap matches "React handles 3
+          # surfaces" and every other sentence with a number in it.
+          JOIN='to|at|from|version|v|sdk|release|track|line|pin|pinned|requires|needs'
+          # `/` is deliberately NOT in the ADJ separator class. It was, and widening the scan
+          # exposed what that cost: "drizzle/0003_rls.sql" — a migration FILENAME in
+          # agents/blueprint-writer.md — read as a pin. Package names that contain a slash are
+          # spelled out in LIB instead (shadcn/ui), so nothing real is lost.
+          ADJ="\b(${LIB})[[:space:]@_-]*v?[0-9]"
+          GAP1="\b(${LIB})[[:space:]]+(${JOIN})[[:space:]]+v?[0-9]"
+          GAP2="\b(${LIB})[[:space:]]+(${JOIN})[[:space:]]+(${JOIN})[[:space:]]+v?[0-9]"
+          BARE='\bgo(lang)?[[:space:]@_-]*v?1\.[0-9]|@[0-9]+\.[0-9]+|(^|[^[:alnum:]])[~^][0-9]+\.[0-9]+'
+          # `:` and `>=` are NOT in the ADJ separator class and could not be added to it: widening
+          # ADJ to include `:` would read every "postgres:5432" as a pin. They need their own
+          # patterns with their own guards. Both shapes were confirmed to pass clean before this:
+          # "postgres:17.2-alpine" and '"node": ">=24.18.0"' were invisible to every pattern above,
+          # and §19.6 now tells the writer to emit pinned image tags as literal values, so the repo
+          # is about to start containing exactly these two shapes.
+          #
+          # COLON — container image tags (postgres:17.2-alpine, node:24-slim, python:3.14).
+          # The digit run is capped at THREE and must be followed by a non-digit or end of line.
+          # That cap is the whole false-positive defence and it is load-bearing:
+          #   postgres:5432, redis:6379, localhost:3000, api:8080  -> 4 digits, no match
+          #   node:24, postgres:17.2-alpine, redis:8-bookworm       -> match
+          # Times (12:30, 02:00) and contrast ratios (4.5:1, 3:1) never reach this pattern at all —
+          # it requires a library NAME on the left of the colon, and "4.5" is not one. Verified
+          # against the real tree: accessibility.md, availability-engine.md and blueprint-template.md
+          # carry all three of those shapes and stay green.
+          COLON="\b(${LIB})"'"?[[:space:]]*:[[:space:]]*"?v?[0-9]{1,3}([^0-9]|$)'
+          # CMP — comparator ranges: package.json engines ("node": ">=24.18.0"), pyproject
+          # (requires-python = ">=3.13"), Cargo and npm ranges ("react": "^19.2.0").
+          # GLUE is the punctuation that separates a name from its constraint across every manifest
+          # format in play — quotes, spaces, `:` and `=`. It has to be this wide: a first cut used
+          # only `"`, space and `:`, and 'requires-python = ">=3.13"' walked straight through it.
+          # Widening it is safe precisely BECAUSE a comparator is required afterwards. No digit cap
+          # is needed either: nothing that is not a version constraint is written `>=` a number
+          # right after a library name. Bare `~` is deliberately NOT a comparator here — it also
+          # means "approximately" ("react ~50 components") — and BARE already catches `~1.2`.
+          GLUE='[[:space:]"'"'"':=]*'
+          CMP="\b(${LIB})${GLUE}"'(>=|<=|==|~=|\^)[[:space:]]*v?[0-9]'
+          # CMPD — bare `<` / `>`, but only when the number carries a dot, so "React > 3 surfaces"
+          # stays clean while "node > 24.1" does not.
+          CMPD="\b(${LIB})${GLUE}"'[<>][[:space:]]*v?[0-9]+\.[0-9]'
+          # Exemptions stay narrow and by exact path — a directory-wide exemption is how the hole
+          # this step just closed opened in the first place.
+          #   knowledge/skills-registry.md — documents OTHER projects' prerequisites ("uses uv +
+          #     Python 3.12"). Those are that project's facts to maintain, not a pin we emit.
+          #   this workflow — its own comments quote the very patterns it hunts for.
+          SKIP='^\./(\.github/workflows/validate\.yml|knowledge/skills-registry\.md):'
+          NAMED=$(grep -rniIE "(${ADJ})|(${GAP1})|(${GAP2})|(${COLON})|(${CMP})|(${CMPD})" \
+                    --exclude-dir=.git --exclude-dir=runtime-tracks . \
+                  | grep -vE "$SKIP" || true)
+          # The third exemption is by PATTERN, not by file. agents/stack-researcher.md's worked
+          # example pins deliberately fictional packages (acme-framework@9.9.9, "^8.7.6") to show
+          # the report format; a package that does not exist cannot go stale. It is exempt from
+          # BARE only — the named-library patterns above still scan it, so a real "Next.js 16.2"
+          # written into that file still fails the build.
+          BAREH=$(grep -rniIE "${BARE}" \
+                    --exclude-dir=.git --exclude-dir=runtime-tracks . \
+                  | grep -vE "$SKIP" | grep -vE '^\./agents/stack-researcher\.md:' || true)
+          HITS=$(printf '%s\n%s\n' "$NAMED" "$BAREH" | grep -v '^[[:space:]]*$' | sort -u || true)
+          if [ -n "$HITS" ]; then
+            echo "$HITS"
+            echo "::error::A library version appears above, outside knowledge/runtime-tracks/." \
+                 "This now covers the whole repo, not just knowledge/ — templates/, agents/," \
+                 "commands/, questions/, skills/ and CLAUDE.md are pin-free too." \
+                 "Shapes say WHAT IT IS, capabilities say WHAT IT DOES, and stack-compatibility.md" \
+                 "states combinations as ROLES — none of them may pin a version, because then" \
+                 "refreshing one library means editing 32 files. That is the exact rot v2 fixed." \
+                 "Move the pin into knowledge/runtime-tracks/ and link to that file instead." \
+                 "This also covers image tags (postgres:17.2-alpine) and comparator ranges" \
+                 "(engines node >=24.18.0) — a literal pinned tag emitted per §19.6 belongs in a" \
+                 "runtime track and gets referenced from here, not copied into a template." \
+                 "Standards (WCAG 2.2, Section 508, SOC 2, Manifest V3, OAuth 2.1, HTTP codes)," \
+                 "CSS values, contrast ratios (4.5:1), times (02:00), port numbers (:3000)," \
+                 "tier labels and ISO dates are allowed and do not match — if one did," \
+                 "tighten the pattern in this workflow, not the file."
+            exit 1
+          fi
+
+      - name: No skill names that were removed in v1.0.0
+        run: |
+          # Matches the bare form as well as the slash form. Half of these were never slash commands
+          # in the first place, so "use shadcn-ui" with no slash is the likelier way one survives.
+          # The leading class also stops github.com/x/deep-research-thing from matching.
+          REMOVED='deep-research|seo-audit|pdf-design|shadcn-ui|chrome-bridge-automation|web-reader|humanizer'
+          HITS=$(grep -rnE "(^|[^A-Za-z0-9._/-])/?(${REMOVED})\b" $SURFACE \
+                 | grep -vE '^(knowledge/skills-registry|agents/blueprint-validator)\.md:' || true)
+          if [ -n "$HITS" ]; then
+            echo "$HITS"
+            echo "::error::This skill was removed in v1.0.0 — it points at nothing, so a blueprint" \
+                 "that names it silently skips the step. Check knowledge/skills-registry.md §4 for" \
+                 "the replacement and copy its exact invocation form. A leading slash means a real" \
+                 "slash command; no slash means the skill auto-activates and adding one is a no-op." \
+                 "Only skills-registry.md and blueprint-validator.md may name these, as denylists."
+            exit 1
+          fi
+
+      - name: Clone mode and plugin mode still agree
+        run: |
+          # CLAUDE.md (clone mode) and skills/architect/SKILL.md (plugin mode) are hand-maintained
+          # twins. Until this step existed they were kept in sync by an HTML comment saying "if you
+          # change one, change both" — the exact enforcement mechanism that let v1's version pins
+          # rot across thirteen files. They had already drifted inside a single release.
+          #
+          # This is NOT a byte diff, and it must not become one. FIVE things are compared, all
+          # normalised for the ${CLAUDE_PLUGIN_ROOT} prefix and for whitespace:
+          #   1. rules  — the numbered non-negotiable rules: COUNT, number, and the bold headline
+          #   2. states — the state names in the STATE MACHINE table (first column only)
+          #   3. shapes — the shape-signal table rows in DISCOVERY, both columns
+          #   4. bodies — the FULL text of every rule whose body is not declared-divergent below
+          #   5. tokens — every path and code span inside EVERY rule body, keyed by rule number,
+          #               including the declared-divergent ones
+          #
+          # 4 and 5 exist because comparing headlines alone was not prevention. It was proved by
+          # planting v1's dead output path into the BODY of rule 10 in one file only: the headline
+          # was untouched, so CI stayed green, and that is the exact drift class that produced four
+          # false BLOCKER findings in an earlier audit round. 4 catches body drift in the nine rules
+          # that must match verbatim. 5 catches it in the three that legitimately do not — a rule
+          # may phrase its body per mode, but it may not name a different FILE per mode.
+          #
+          # LEGITIMATE DIFFERENCES, deliberately not compared — do not "fix" these by tightening
+          # the check, and do not delete the check because you hit one:
+          #   - Path prefixes. Clone mode is repo-relative; plugin mode is
+          #     ${CLAUDE_PLUGIN_ROOT}-prefixed. Normalised away.
+          #   - Three rule bodies, matched by HEADLINE not by number so renumbering cannot silently
+          #     widen the exemption. Version-verification: clone verifies pins itself with WebFetch,
+          #     plugin dispatches stack-researcher. Output location: clone documents single-file
+          #     mode, plugin warns off the read-only plugin cache. Running brief: plugin adds that
+          #     the skill file will not be re-read. All three still go through the token check.
+          #   - The state table's Read and Exit columns. BROWNFIELD reads a commands/ file in clone
+          #     mode and "see below" in plugin mode, because commands/ does not load from a clone;
+          #     GENERATE exits on "self-audit clean" versus "validator clean" for the same reason.
+          #   - Whole sections that exist in one file only: the plugin's Subagents and Commands
+          #     tables, the clone's "Plugin mode dispatches / Clone mode does" fallback table.
+          #     Those sections ARE the difference between the modes.
+          CLONE=CLAUDE.md
+          PLUGIN=skills/architect/SKILL.md
+          norm() { sed -E 's/\$\{CLAUDE_PLUGIN_ROOT\}\///g; s/[[:space:]]+/ /g; s/^ //; s/ $//'; }
+          # Rule bodies wrap across continuation lines; fold each rule back onto one line first.
+          fold()   { sed -n '/^## NON-NEGOTIABLE RULES/,/^## STATE MACHINE/p' "$1" \
+                     | awk '/^[0-9]+\. \*\*/{if(n)print s; s=$0; n=1; next}
+                            n && /^[[:space:]]+[^[:space:]]/{s=s" "$0; next}
+                            n{print s; n=0}
+                            END{if(n)print s}' | norm; }
+          rules()  { fold "$1" | sed -E 's/^([0-9]+)\. \*\*([^*]+)\*\*.*/\1 \2/'; }
+          states() { sed -n '/^## STATE MACHINE/,/^### DISCOVERY/p' "$1" \
+                     | grep -E '^\| [A-Z][A-Z ]+\|' \
+                     | sed -E 's/^\| *([A-Z][A-Z ]*[A-Z]) *\|.*/\1/' | norm; }
+          shapes() { sed -n '/^### DISCOVERY/,/^### DEEP DIVE/p' "$1" \
+                     | grep -E '^\|' | grep -vE '^\|[-: |]+\|$' | norm; }
+          # Exemption is by headline text, so renumbering the list cannot quietly exempt a
+          # different rule. If a headline itself drifts, `rules` above fails first.
+          DIVERGENT='Never recall a version number|Write output to the user|Maintain a RUNNING BRIEF'
+          bodies() { fold "$1" | grep -vE "$DIVERGENT"; }
+          # Every backticked span and every slash-bearing path in a rule, tagged with its rule
+          # number. Prose may differ between modes; the artefacts a rule points at may not.
+          tokens() { fold "$1" | awk '
+                       { n=$1; sub(/\./,"",n); line=$0
+                         while (match(line, "`[^`]+`")) {
+                           print n" "substr(line,RSTART+1,RLENGTH-2)
+                           line=substr(line,RSTART+RLENGTH) }
+                         line=$0
+                         while (match(line, "[A-Za-z0-9_.<>-]+/[A-Za-z0-9_.<>/-]*")) {
+                           print n" "substr(line,RSTART,RLENGTH)
+                           line=substr(line,RSTART+RLENGTH) } }' | sort -u; }
+          FAIL=0
+          for PART in rules states shapes bodies; do
+            A=$($PART "$CLONE"); B=$($PART "$PLUGIN")
+            NA=$(printf '%s\n' "$A" | grep -c . || true)
+            NB=$(printf '%s\n' "$B" | grep -c . || true)
+            echo "$PART: clone=$NA plugin=$NB"
+            if [ "$NA" = 0 ]; then
+              echo "::error::Extracted zero $PART from $CLONE. The headings this step keys off" \
+                   "(## NON-NEGOTIABLE RULES, ## STATE MACHINE, ### DISCOVERY, ### DEEP DIVE)" \
+                   "moved or were renamed. Re-point the sed ranges — a silently empty comparison" \
+                   "is worse than no comparison."
+              FAIL=1
+            fi
+            if [ "$A" != "$B" ]; then
+              echo "--- $CLONE (clone mode)   +++ $PLUGIN (plugin mode)"
+              diff <(printf '%s\n' "$A") <(printf '%s\n' "$B") || true
+              FAIL=1
+            fi
+          done
+          # Token parity, including the three declared-divergent bodies. The allowlist below is
+          # the COMPLETE set of artefacts one mode may name and the other may not, and it is two
+          # lines long on purpose — if it starts growing, the two files are diverging for real and
+          # the answer is to fix them, not to append here. Anything else asymmetric fails, which
+          # is what catches a retired path smuggled into a body the prose check has to skip.
+          CLONE_ONLY='^10 \./blueprints/<project-slug>-blueprint\.md$'
+          PLUGIN_ONLY='^6 stack-researcher$'
+          TA=$(tokens "$CLONE"  | grep -vE "$CLONE_ONLY"  || true)
+          TB=$(tokens "$PLUGIN" | grep -vE "$PLUGIN_ONLY" || true)
+          echo "tokens: clone=$(printf '%s\n' "$TA" | grep -c . || true)" \
+               "plugin=$(printf '%s\n' "$TB" | grep -c . || true)"
+          if [ "$TA" != "$TB" ]; then
+            echo "--- $CLONE (clone mode)   +++ $PLUGIN (plugin mode)   [rule-number tokens]"
+            diff <(printf '%s\n' "$TA") <(printf '%s\n' "$TB") || true
+            echo "::error::A rule names a path or code span in one mode that it does not name in" \
+                 "the other. Rule prose may differ per mode; the artefacts a rule points at may" \
+                 "not — that is how a dead v1 path survives in one file while the headline check" \
+                 "reads green. A left-hand line is clone-only, a right-hand line is plugin-only." \
+                 "Fix the file that is wrong. Only add to CLONE_ONLY/PLUGIN_ONLY if the asymmetry" \
+                 "is a real mode difference, and say why in a comment when you do."
+            FAIL=1
+          fi
+          if [ "$FAIL" != 0 ]; then
+            echo "::error::The two mode entrypoints have drifted on something that must match." \
+                 "A user in clone mode and a user in plugin mode must get the same twelve rules," \
+                 "the same rule TEXT, the same state machine, and the same shape routing — only" \
+                 "the path prefix and the subagent story may differ. Fix the file that is wrong," \
+                 "in BOTH places. See the comment at the top of this step for what is legitimately" \
+                 "allowed to differ before you assume the check is too strict."
+            exit 1
+          fi
+
+      - name: No retired v1 constructs on any instruction surface
+        run: |
+          # The second half of the mode-parity fix, and the half that does not care WHERE the text
+          # landed. The parity check only sees the two twin files and only sees rules; this sees
+          # every file the Architect actually reads at runtime. A v1 path is not merely stale — it
+          # resolves to nothing, so the Architect reads nothing and designs from memory, and a
+          # reviewer who trusts it files BLOCKERs against a layout that has not existed since v1.
+          #
+          # Scope is the runtime instruction surface: SURFACE minus README.md. README is excluded
+          # BY DESIGN — it carries the v1-to-v2 migration table and MUST name the old paths to tell
+          # a v1 user what moved. Same for CHANGELOG.md and VERSIONING.md, which are not in SURFACE
+          # at all. Those three are documentation about history; everything below is instruction
+          # that gets executed.
+          SCOPE="CLAUDE.md knowledge commands agents skills questions templates"
+          #   output/<...>blueprint      v1 wrote into the repo; v2 writes ./blueprints/ in the
+          #                              user's cwd. Bare "output/" is NOT matched — phase-4
+          #                              Step 7 names it as an explicit negative example, and
+          #                              cli-library-mcp.md has an output/ package directory.
+          #   archetypes/                -> knowledge/shapes/
+          #   building-blocks/           -> knowledge/capabilities/
+          #   content-platform.md        -> shapes/content-community-platform.md (the leading class
+          #                              stops content-COMMUNITY-platform.md from matching)
+          #   16 sections                the v1 blueprint contract; v2 is 20, and CLAUDE.md is
+          #                              §19.1 rather than §15
+          DEAD='output/[A-Za-z0-9_.<>-]*blueprint'
+          DEAD="$DEAD"'|(^|[^A-Za-z0-9-])archetypes/|building-blocks/'
+          DEAD="$DEAD"'|(^|[^A-Za-z0-9-])content-platform\.md'
+          DEAD="$DEAD"'|\b(16|sixteen)[- ]sections?\b'
+          HITS=$(grep -rniIE "$DEAD" $SCOPE || true)
+          if [ -n "$HITS" ]; then
+            echo "$HITS"
+            echo "::error::A construct retired in v1.0.0 appears above. These paths and contracts" \
+                 "do not exist: knowledge/archetypes/ is knowledge/shapes/, knowledge/building-blocks/" \
+                 "is knowledge/capabilities/, content-platform.md is content-community-platform.md," \
+                 "the blueprint contract is 20 sections not 16, and output/ became ./blueprints/ in" \
+                 "the user's working directory. See CHANGELOG.md for the full v1 to v2 rename table." \
+                 "README.md, CHANGELOG.md and VERSIONING.md are exempt — they document the move." \
+                 "Nothing under $SCOPE is, because those files are read as instructions."
+            exit 1
+          fi
+
+      - name: Every cross-reference resolves
+        run: |
+          # All six real roots, not just knowledge/. Checking one root is how three dead fallback
+          # filenames survived: a broken templates/ or agents/ path is exactly as fatal as a broken
+          # knowledge/ one. The sed drops .claude/... tokens first — those describe the GENERATED
+          # project's workspace, which does not exist in this repo.
+          MISSING=$(find $SURFACE -type f -print0 \
+                    | xargs -0 sed -E 's#\.claude/[^ )`"]*##g' \
+                    | grep -oE '\b(knowledge|templates|questions|commands|agents|skills)/[A-Za-z0-9_./-]+\.md' \
+                    | sort -u | while read -r f; do [ -f "$f" ] || echo "  $f"; done)
+          if [ -n "$MISSING" ]; then
+            echo "$MISSING"
+            echo "::error::These files are referenced but do not exist. A blueprint is only" \
+                 "self-contained if every path in it resolves — a dead link means the Architect" \
+                 "reads nothing and designs from memory. Fix the path, or add the file. Paths are" \
+                 "repo-relative in knowledge/ and CLAUDE.md, and \${CLAUDE_PLUGIN_ROOT}-prefixed in" \
+                 "commands/, agents/ and skills/; both forms are checked by the same rule."
+            exit 1
+          fi
+
+      - name: Every image resolves, is used, and has alt text
+        run: |
+          # The check above only follows .md paths. Images are cross-references too, and a renamed
+          # asset fails silently: GitHub renders a broken tile while CI stays green. Three ways to
+          # be wrong, so three assertions — dangling reference, orphan file, and missing alt text.
+          # Alt text is not decoration here: accessibility is a shipped capability, and a README
+          # that preaches WCAG while serving six unlabelled images is arguing against itself.
+          FAIL=0
+
+          # -r on every grep: SURFACE mixes directories with files. Without it the directories are
+          # skipped with a warning and the step passes for the wrong reason — green only because
+          # today every image happens to live in README.md.
+          REFS=$(grep -rohE 'assets/[A-Za-z0-9_-]+\.(webp|png|jpg|jpeg|svg|gif)' $SURFACE | sort -u)
+          for f in $REFS; do
+            [ -f "$f" ] || { echo "  dangling: $f"; FAIL=1; }
+          done
+
+          # One named exemption, not a loosened rule: the social preview is consumed by GitHub's
+          # repo settings (Settings -> Social preview), never by markdown, so "referenced nowhere"
+          # is true of it and still correct. Exempting the one real case keeps the check meaningful
+          # for every other asset; widening the rule to "images may be unreferenced" would not.
+          for f in $(find assets -type f 2>/dev/null | sort); do
+            [ "$f" = "assets/social-preview.jpg" ] && continue
+            grep -rqF "$f" $SURFACE || { echo "  orphan:   $f is committed but referenced nowhere"; FAIL=1; }
+          done
+
+          # Markdown ![](…) with an empty alt, and any <img> tag carrying no alt= at all.
+          NOALT=$(grep -rnE '!\[[[:space:]]*\]\(' $SURFACE || true)
+          NOALT="$NOALT$(grep -rnE '<img[^>]*>' $SURFACE | grep -v 'alt=' || true)"
+          if [ -n "$(echo "$NOALT" | tr -d '[:space:]')" ]; then
+            echo "$NOALT" | sed 's/^/  no alt:  /'
+            FAIL=1
+          fi
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo "::error::An image reference is dangling, an asset is committed but unused, or an" \
+                 "image ships without alt text. Fix the path, delete the orphan, or write the alt."
+            exit 1
+          fi

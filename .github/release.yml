@@ -1,0 +1,48 @@
+# Auto-generated release notes for The Architect.
+# GitHub places each merged PR in the FIRST category whose labels match, so order is meaningful.
+# The catch-all "*" must stay last or it swallows everything above it.
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+      - duplicate
+      - invalid
+      - question
+      - needs-triage
+
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking-change
+        - breaking
+
+    - title: New Shapes and Knowledge
+      labels:
+        - shape
+        - capability
+        - runtime-track
+        - stale-knowledge
+        - knowledge
+
+    - title: Improvements
+      labels:
+        - enhancement
+        - improvement
+        - blueprint-quality
+        - performance
+
+    - title: Fixes
+      labels:
+        - bug
+        - fix
+
+    - title: Docs
+      labels:
+        - documentation
+        - docs
+
+    # Catch-all. Keep last.
+    - title: Other Changes
+      labels:
+        - "*"

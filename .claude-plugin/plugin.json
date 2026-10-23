@@ -1,0 +1,26 @@
+{
+  "name": "the-architect",
+  "version": "2.5.0",
+  "description": "EN: Senior software design consultant. Interviews you about what you want to build, designs the complete architecture, and generates a self-contained blueprint another Claude Code instance can build from autonomously — with acceptance criteria and a verify command on every step. Works on new projects and existing codebases. ES: Consultor senior de diseño de software. Te entrevista sobre lo que quieres construir, diseña la arquitectura completa, y genera un blueprint autocontenido desde el cual otra instancia de Claude Code puede construir de forma autónoma.",
+  "author": {
+    "name": "Enrique Henry",
+    "url": "https://github.com/Hainrixz"
+  },
+  "homepage": "https://tododeia.com",
+  "repository": "https://github.com/Hainrixz/the-architect",
+  "license": "MIT",
+  "keywords": [
+    "architecture",
+    "blueprint",
+    "planning",
+    "spec",
+    "scaffolding",
+    "design",
+    "meta-agent",
+    "arquitectura",
+    "claude-code",
+    "greenfield",
+    "brownfield",
+    "community"
+  ]
+}

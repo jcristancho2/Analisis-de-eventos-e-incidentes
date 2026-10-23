@@ -1,0 +1,82 @@
+name: Stale version pin or outdated recommendation
+description: A pinned version moved on, or a recommendation is no longer the right call. Takes a minute.
+title: "[stale] "
+labels: ["stale-knowledge", "knowledge"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks — this is the single most useful issue you can file here. The Architect is only as
+        good as its pins, and pins rot silently.
+
+        **You do not need to know the fix.** File it with whatever you have; a source URL and the
+        file name is plenty. Do not open a PR first — this form is faster for both of us.
+
+  - type: input
+    id: file
+    attributes:
+      label: File
+      description: Path in this repo. Version pins live only in `knowledge/runtime-tracks/`.
+      placeholder: knowledge/runtime-tracks/ts-node.md
+    validations:
+      required: true
+
+  - type: input
+    id: subject
+    attributes:
+      label: Package or recommendation
+      description: The package name, or the sentence that is out of date.
+      placeholder: "next  ·  or: \"use middleware.ts for auth redirects\""
+    validations:
+      required: true
+
+  - type: input
+    id: current
+    attributes:
+      label: What the file says now
+      placeholder: "16.2.12"
+    validations:
+      required: true
+
+  - type: input
+    id: expected
+    attributes:
+      label: What it should say
+      description: Leave blank if you only know it is wrong, not what is right.
+      placeholder: "16.4.1"
+    validations:
+      required: false
+
+  - type: input
+    id: source
+    attributes:
+      label: Authoritative source URL
+      description: >-
+        The registry page, the release notes, or the vendor doc. A registry or the package's own
+        published files beat a blog post, and both beat a search result.
+      placeholder: https://www.npmjs.com/package/next?activeTab=versions
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Does this break a build?
+      options:
+        - "Yes — a blueprint using this pin fails to install or fails to run"
+        - "No — just behind, the pinned version still works"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: >-
+        Optional. Breaking changes, renames, a peer-dependency conflict, or the error you hit.
+      placeholder: >-
+        The config key was renamed; the old one now warns at build time and is dropped in the next
+        major.
+    validations:
+      required: false

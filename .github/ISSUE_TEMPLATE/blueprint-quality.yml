@@ -1,0 +1,153 @@
+name: Blueprint quality problem
+description: The Architect generated a blueprint and something in it was wrong, missing, or unbuildable.
+title: "[blueprint] "
+labels: ["blueprint-quality", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The blueprint is the product. If a builder could not follow it, that is a bug here — not a
+        bug in your prompt.
+
+        **Do not paste the whole blueprint.** Paste the section or build step that failed. If it
+        is a stale version pin, use the
+        [stale knowledge form](https://github.com/Hainrixz/the-architect/issues/new?template=stale-knowledge.yml)
+        instead — it is faster.
+
+  - type: dropdown
+    id: shape
+    attributes:
+      label: Shape it classified as
+      description: Blueprint Section 1 names it. Pick "wrong shape" if that is the bug.
+      options:
+        - "agent-app"
+        - "api-backend"
+        - "automation-bot-integration"
+        - "browser-extension"
+        - "cli-library-mcp"
+        - "content-community-platform"
+        - "data-pipeline-analytics"
+        - "desktop-app"
+        - "ecommerce-storefront"
+        - "generative-media-app"
+        - "internal-tool"
+        - "marketing-site"
+        - "mobile-app"
+        - "saas-webapp"
+        - "It picked the wrong shape — that is the problem"
+        - "Not sure / not stated"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: How you generated it
+      options:
+        - "/architect — full interview"
+        - "/architect-quick — fast track"
+        - "/architect-brownfield — existing repo"
+        - "/architect-next — resumed an existing blueprint"
+        - "/architect-refresh"
+        - "/architect-audit"
+        - "Clone mode (CLAUDE.md, no plugin)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: output
+    attributes:
+      label: Output layout
+      options:
+        - "Bundle — ./blueprints/<slug>/ with tasks.json and epics/"
+        - "Single file — ./blueprints/<slug>-blueprint.md"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: What went wrong
+      multiple: true
+      options:
+        - "A build step had no runnable verify command, or the command did not work"
+        - "An acceptance criterion could not be checked by a machine (needed a human or an approval queue)"
+        - "A version pin was wrong, stale, or invented"
+        - "A file, API, or config key named in the blueprint does not exist"
+        - "A required section was missing, empty, or misnumbered"
+        - "Build steps were out of order, or a step depended on something not yet built"
+        - "A step was far too large for one sitting"
+        - "It classified the brief into the wrong shape"
+        - "It recommended a skill that does not exist or whose install command failed"
+        - "The generated CLAUDE.md / workspace files were wrong"
+        - "It wrote output somewhere other than ./blueprints/ in my working directory"
+        - "Something else"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What went wrong, concretely
+      description: |
+        Paste the offending part of the blueprint verbatim — section number and step — then say
+        what it should have said instead. It lands in a code block, so the original formatting
+        survives. For example:
+
+        > Section 9, step 6 reads `**Wire the billing webhook** — *Done when:* billing works end
+        > to end.` There is no verify command and "billing works" is not observable. Every other
+        > step in the file has one, so this reads like a miss rather than a deliberate exception.
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: builder-behavior
+    attributes:
+      label: What the builder did with it
+      description: >-
+        The whole point of a blueprint is autonomous execution, so this is the part that matters
+        most. Did the builder stall, ask you a clarifying question, silently self-certify the step,
+        invent an API, or build the wrong thing? How far did it get before it went off?
+      placeholder: |
+        Claude Code got through steps 1-5 clean. On step 6 it wrote the webhook handler, declared
+        it done with no test, and moved on. Step 8 then failed because no subscription row ever
+        existed. It backtracked twice and asked me what the plan intended.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: validator
+    attributes:
+      label: Did blueprint-validator pass it?
+      description: The bundled subagent that checks a blueprint before you build from it.
+      options:
+        - "Yes — it passed, and it should not have"
+        - "No — it flagged this, and I built anyway"
+        - "No — it flagged something else, not this"
+        - "I did not run it"
+        - "I ran it and it errored"
+        - "Did not know it existed"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: "`/plugin list`, or the `version` field in `.claude-plugin/plugin.json` if you cloned."
+      placeholder: "2.0.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: brief
+    attributes:
+      label: The brief you gave it
+      description: >-
+        Optional but very helpful — a wrong classification is almost never reproducible without it.
+        Redact freely; the shape of the request is what matters, not your product.
+      render: markdown
+    validations:
+      required: false

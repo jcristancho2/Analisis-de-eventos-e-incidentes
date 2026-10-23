@@ -1,0 +1,8 @@
+{
+  "name": "Cerebro - Agente Clínico FCV",
+  "description": "Sistema de seguimiento clínico por centros de excelencia de la Fundación Cardiovascular de Colombia (FCV).",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

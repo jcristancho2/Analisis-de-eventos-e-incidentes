@@ -1,0 +1,214 @@
+name: Propose a new shape
+description: Argue that a project type exists which none of the current 14 shapes can express.
+title: "[shape] "
+labels: ["shape", "knowledge", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A **shape** answers *what is it?* — not what it is written in (that is a
+        `knowledge/runtime-tracks/` file) and not what it does (that is a
+        `knowledge/capabilities/` file).
+
+        The bar is deliberately high. Fourteen shapes already cover most briefs, and every shape
+        added makes classification harder for all the others. Most good proposals turn out to be a
+        **capability** on an existing shape — a booking flow, a payments rail, an agent loop — and
+        those are much easier to land. Make the case that this is genuinely a different animal.
+
+        Before filing, skim [`knowledge/shapes/`](https://github.com/Hainrixz/the-architect/tree/main/knowledge/shapes)
+        and [`knowledge/capabilities/`](https://github.com/Hainrixz/the-architect/tree/main/knowledge/capabilities).
+
+  - type: input
+    id: name
+    attributes:
+      label: Proposed shape name
+      description: The human name, plus the filename you would use. Lowercase, hyphenated, singular.
+      placeholder: "Multiplayer Game Client — knowledge/shapes/multiplayer-game-client.md"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What is it?
+      description: >-
+        One paragraph a stranger could classify from. Who builds this, what the user of the built
+        thing does with it, and what it runs on.
+      placeholder: |
+        A real-time multiplayer client where 2-64 players share authoritative server state at
+        20-60 ticks per second. Built by small game studios and by teams shipping collaborative
+        canvases. Ships as a browser or native client against a dedicated game server.
+    validations:
+      required: true
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Three real projects that are this shape
+      description: Real, named, linkable. If you cannot name three, this is probably not a shape yet.
+      placeholder: |
+        1. https://example.com — why it is this shape and not a SaaS web app
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: closest
+    attributes:
+      label: Closest existing shape
+      description: The one an interview would classify this into today.
+      options:
+        - "agent-app — Agent App"
+        - "api-backend — API / Backend Service"
+        - "automation-bot-integration — Automation / Bot / Integration"
+        - "browser-extension — Browser Extension"
+        - "cli-library-mcp — CLI / Library / MCP Server"
+        - "content-community-platform — Content & Community Platform"
+        - "data-pipeline-analytics — Data Pipeline & Analytics"
+        - "desktop-app — Desktop App"
+        - "ecommerce-storefront — E-commerce Storefront"
+        - "generative-media-app — Generative Media App"
+        - "internal-tool — Internal Tool / Admin Dashboard"
+        - "marketing-site — Marketing / Content Site"
+        - "mobile-app — Mobile App"
+        - "saas-webapp — SaaS Web Application"
+    validations:
+      required: true
+
+  - type: textarea
+    id: why-not
+    attributes:
+      label: Why the closest shape cannot express it
+      description: >-
+        Be specific about the file. Which of its build steps are wrong for your project, which of
+        its core capabilities do not apply, and what would be missing from a blueprint generated
+        against it. "It feels different" is not an answer.
+      placeholder: |
+        `saas-webapp.md` assumes request/response over HTTP and a relational tenant model. Its
+        build order has no step for a fixed-tick simulation loop, client-side prediction, or
+        server reconciliation — steps 4 through 9 would all be discarded. Its data model has no
+        concept of a per-tick snapshot.
+    validations:
+      required: true
+
+  - type: textarea
+    id: distinct
+    attributes:
+      label: What is architecturally distinct about it?
+      description: >-
+        The heart of the proposal. Name the structural facts that force different decisions — the
+        execution model, the trust boundary, the failure mode, the deployment target, the thing
+        that is hard. A different *industry* is not architectural distinctness; a different
+        *consistency model* is.
+      placeholder: |
+        - Authoritative server tick loop; the client renders a prediction and reconciles on
+          correction. Nothing else in the repo has a simulation loop.
+        - State is a diffable snapshot per tick, not rows mutated by requests.
+        - Latency budget is per-frame, not per-request — the failure mode is visible rubber-banding.
+        - The trust boundary is inverted: the client is assumed hostile and never authoritative.
+    validations:
+      required: true
+
+  - type: textarea
+    id: data-model
+    attributes:
+      label: The recurring data model
+      description: |
+        The entities this shape has *almost every time*, and how they relate. Names and
+        relationships only — no SQL dialect, no ORM syntax, no version numbers. If you cannot list
+        entities that recur across your three examples, the shape is not stable enough to add.
+        Paste a raw markdown table; it lands in a code block so a maintainer can lift it straight
+        into the shape file. Shaped like this:
+
+        `| Entity | Holds | Relates to |`
+        `| Match | lifecycle, ruleset, tick counter | has many Participants, has many Snapshots |`
+        `| Participant | identity, connection state, input buffer | belongs to Match |`
+        `| Snapshot | tick number, authoritative world state | belongs to Match |`
+      render: markdown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: confusable
+    attributes:
+      label: Which existing shapes would this be confused with?
+      description: >-
+        Pick every shape a real brief could plausibly land on instead. Each one you pick needs a
+        two-way classification edge — your shape's "No if" points at it, and its "No if" points
+        back. Pick at least three.
+      multiple: true
+      options:
+        - "agent-app"
+        - "api-backend"
+        - "automation-bot-integration"
+        - "browser-extension"
+        - "cli-library-mcp"
+        - "content-community-platform"
+        - "data-pipeline-analytics"
+        - "desktop-app"
+        - "ecommerce-storefront"
+        - "generative-media-app"
+        - "internal-tool"
+        - "marketing-site"
+        - "mobile-app"
+        - "saas-webapp"
+    validations:
+      required: true
+
+  - type: textarea
+    id: discriminators
+    attributes:
+      label: The discriminating signal for each confusable shape
+      description: >-
+        For every shape you picked above, the concrete thing a user says in the interview that
+        sends the brief to yours instead of theirs — and the thing that sends it the other way.
+        This is the text that becomes both sides of the reciprocal edge.
+      placeholder: |
+        - **vs `saas-webapp`** — mine if they say "players see each other move in real time";
+          theirs if the shared state is documents saved on submit rather than a simulation tick.
+        - **vs `desktop-app`** — mine if the hard part is the netcode; theirs if the hard part is
+          filesystem access, native menus, and code signing.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: track
+    attributes:
+      label: Default runtime track
+      options:
+        - "ts-node — TypeScript / Node.js"
+        - "python — Python"
+        - "go — Go"
+        - "rails-laravel — Rails / Laravel"
+        - "mobile-native — Mobile Native"
+        - "None of these fit — explain below"
+    validations:
+      required: true
+
+  - type: textarea
+    id: capabilities
+    attributes:
+      label: Core capabilities and gaps
+      description: >-
+        Which existing `knowledge/capabilities/` files this shape pulls in, and whether it needs a
+        capability that does not exist yet. A missing capability is often the real ask.
+      placeholder: |
+        Uses: auth.md, observability.md, deployment.md.
+        Needs a new capability: netcode/state-reconciliation — does not exist today.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: commitment
+    attributes:
+      label: Before you submit
+      options:
+        - label: I checked that no existing shape covers this, and that this is not just a capability.
+          required: true
+        - label: >-
+            I understand a new shape means editing the confusable shapes too, so the classification
+            edges go both ways.
+          required: true
+        - label: I am willing to write the shape file and the reciprocal edits myself.
+          required: false
